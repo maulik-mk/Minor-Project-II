@@ -1,16 +1,26 @@
-"use client"
+"use client";
 
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
-import { z } from "zod"
-
-import { Button } from "@/components/ui/button"
-import { Form} from "@/components/ui/form"
-import Image from "next/image";
+import { z } from "zod";
 import Link from "next/link";
-import {toast} from "sonner";
-import FormField from "@/components/FormField";
-import {useRouter} from "next/navigation";
+import Image from "next/image";
+import { toast } from "sonner";
+import { auth } from "@/firebase/client";
+import { useForm } from "react-hook-form";
+import { useRouter } from "next/navigation";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
+
+import { Form } from "@/components/ui/form";
+import { Button } from "@/components/ui/button";
+
+import { signIn, signUp } from "@/lib/actions/auth.action";
+import FormField from "./FormField";
+
+type FormType = "sign-in" | "sign-up";
 
 const authFormSchema = (type: FormType) => {
     return z.object({
@@ -34,83 +44,116 @@ const authFormSchema = (type: FormType) => {
       },
     })
 
-    function onSubmit(values: z.infer<typeof formSchema>) {
+    async function onSubmit(values: z.infer<typeof formSchema>) {
       try {
         if (type === "sign-up") {
+          const { name, email, password } = values;
+
+           const userCredential = await createUserWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+
+        const result = await signUp({
+          uid: userCredential.user.uid,
+          name: name!,
+          email,
+          password,
+        });
+
+         if (!result.success) {
+          toast.error(result.message);
+          return;
+        }
+
           toast.success("Account Created Successfully Please Sign In");
           router.push("/sign-in");
         }
         else {
+
+           const { email, password } = values;
+
+        const userCredential = await signInWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+
+        const result = await signIn({
+          uid: userCredential.user.uid,
+        });
+
+        if (!result.success) {
+          toast.error(result.message);
+          return;
+        }
           toast.success("Sign In Successfully");
           router.push("/");
         }
-      } catch (error) {
-        console.log(error);
-        toast.error(`There Was An Error: ${error}`);
+      } catch (error: any) {
+        toast.error(error.message);
       }
     }
 
-    const isSignIn = type === "sign-in";
-
     return (
-      <div className="card-border lg:min-w-[566px]">
-        <div className="flex flex-col gap-6 card py-14 px-10">
-          <div className="flex flex-row gap-2 justify-center">
-            <Image
-              src="/logo.svg"
-              alt="logo"
-              height={32}
-              width={38}
-            />
-            <h2 className="text-primary-100">PrepWise</h2>
-          </div>
+        <section className="flex-center size-full max-sm:px-6">
+            <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-y-2">
+                        <div className="flex items-center justify-center gap-x-2">
+                            <Image src="/logo.svg" width={34} height={34} alt="PrepWise" />
+                            <h1 className="text-2xl font-bold">PrepWise</h1>
+                        </div>
+                        <h2 className="text-center text-lg">
+                            {type === "sign-in" ? "Welcome back" : "Create an account"}
+                        </h2>
+                        <p className="text-center text-sm text-gray-500">
+                            {type === "sign-in"
+                                ? "Enter your credentials to access your account"
+                                : "Enter your details to get started"}
+                        </p>
+                    </div>
 
-          <h3>Practice job interview with AI</h3>
+                    {type === "sign-up" && (
+                        <FormField
+                            control={form.control}
+                            name="name"
+                            label="Name"
+                            placeholder="Enter your name"
+                        />
+                    )}
 
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="form space-y-8">
-              {!isSignIn && (
+                    <FormField
+                        control={form.control}
+                        name="email"
+                        label="Email"
+                        placeholder="Enter your email"
+                    />
 
-                // Name
-                <FormField
-                  control={form.control}
-                  name="name"
-                  label="Name"
-                  placeholder="Name"
-                />
-              )}
+                    <FormField
+                        control={form.control}
+                        name="password"
+                        label="Password"
+                        placeholder="Enter your password"
+                    />
 
-              {/* Email */}
-              <FormField
-                  control={form.control}
-                  name="email"
-                  label="Email"
-                  placeholder="Email"
-                  type="email"
-                />
+                    <Button type="submit" className="mt-4">
+                        {type === "sign-in" ? "Sign In" : "Sign Up"}
+                    </Button>
+                </form>
+            </Form>
 
-              {/* Password */}
-              <FormField
-                  control={form.control}
-                  name="password"
-                  label="Password"
-                  placeholder="Password"
-                  type="password"
-                />
-
-              <Button className="btn" type="submit">{isSignIn ? "Sign In" : "Create An Account"}</Button>
-            </form>
-          </Form>
-
-          <p className="text-center">
-            {isSignIn ? 'No account yet?' : 'Have an account already?'}
-            <Link href={!isSignIn ? '/sign-in' : '/sign-up'} className="font-bold text-user-primary ml-1">
-              {!isSignIn ? "Sign in" : 'Sign up'}
-            </Link>
-          </p>
-        </div>
-      </div>
+            <footer className="mt-4 text-center text-sm">
+                {type === "sign-in"
+                    ? "Don't have an account?"
+                    : "Already have an account?"}
+                <Link href={type === "sign-in" ? "/sign-up" : "/sign-in"} className="text-primary-100 hover:underline ml-1">
+                    {type === "sign-in" ? "Sign Up" : "Sign In"}
+                </Link>
+            </footer>
+        </section>
     )
-  };
+}
 
-  export default AuthForm;
+export default AuthForm;
