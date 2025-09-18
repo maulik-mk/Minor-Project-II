@@ -1,3 +1,4 @@
+import { SignUpParams, SignInParams, User } from "@/types";
 "use server";
 
 import { auth, db } from "@/firebase/admin";
@@ -79,6 +80,11 @@ export async function signIn(params: SignInParams) {
       };
 
     await setSessionCookie(idToken);
+
+    return {
+      success: true,
+      message: "Sign in successful.",
+    };
   } catch (error: any) {
     console.log("");
 
